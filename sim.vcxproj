@@ -140,6 +140,20 @@
       <Project>{eecdbe60-e01b-45d4-8449-23afdda138ef}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\erode.frag" />
+    <None Include="shaders\erode.vert" />
+    <None Include="shaders\flow.frag" />
+    <None Include="shaders\flow.vert" />
+    <None Include="shaders\terrain.frag" />
+    <None Include="shaders\terrain.tesc" />
+    <None Include="shaders\terrain.tese" />
+    <None Include="shaders\terrain.vert" />
+    <None Include="shaders\water.frag" />
+    <None Include="shaders\water.tesc" />
+    <None Include="shaders\water.tese" />
+    <None Include="shaders\water.vert" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

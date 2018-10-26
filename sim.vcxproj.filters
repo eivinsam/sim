@@ -13,10 +13,51 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{a36e3a69-649c-4a46-9267-221283a5d07d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\terrain.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\terrain.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\terrain.tesc">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\terrain.tese">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\flow.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\flow.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\water.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\water.tesc">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\water.tese">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\water.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\erode.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="shaders\erode.vert">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
