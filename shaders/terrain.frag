@@ -15,5 +15,4 @@ void main()
 	frag_color = vec4(texture(tex, uv).r*0 + normal.zzz*0.9 + 0.1, 1);
 
 	frag_color = vec4((uv-0.5)/textureSize(tex), 0, 1);
-	frag_color.xyz = pow(frag_color.xyz, vec3(2.4));
 }

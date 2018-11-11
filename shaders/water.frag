@@ -1,6 +1,7 @@
 #version 430
 
-uniform sampler2DRect tex;
+layout(binding=0) uniform sampler2DRect tex;
+layout(binding=1) uniform sampler2DRect sed;
 
 in vec2 uv;
 in vec3 wpos;
@@ -14,17 +15,20 @@ void main()
 	vec2 dy = vec2(0, 1);
 	vec3 normal = normalize(vec3(
 		height(texture(tex, uv-dx)) - height(texture(tex, uv+dx)),
-		height(texture(tex, uv-dy)) - height(texture(tex, uv+dy)), 0.01));
+		height(texture(tex, uv-dy)) - height(texture(tex, uv+dy)), 0.005));
 
 
 	vec4 w = texture(tex, uv);
 
-	float wetness = min(1, max(0, w.z-0*0.00085)*500);
+	vec2 s = texture(sed, uv).xy;
+
+	float wzs = w.z*200;
+	float wetness = clamp(sqrt(wzs) + length(w.xy)*5000, 0, 1); //clamp(1-(1-min(wzs,1))*(1-min(wzs,1)), 0, 1);
 	float rockyness = clamp((1-normal.z)*30 -7, 0, 1);
 
 
 	frag_color = vec4(vec3(max(0, sin((w.w)*6.28*100)-0.8))*0.5 + 
-		((normal.z*0.8+0.1)*vec3(0,0.7-6*w.z,0.6)*wetness + (1-wetness)*(
+		((normal.z*0.7+0.2)*vec3(0,0.7-10*w.z,0.6)*wetness + (1-wetness)*(
 		(normal.z*0.6+0.3)*vec3(0.7, 0.98-0.4*(w.z+w.w), 0.4)*(1-rockyness) + (normal.z*0.7+0.2)*rockyness*vec3(0.65, 0.65, 0.6))  ), 1);
 
 	vec3 eye = -gl_ModelViewMatrix[3].xyz*mat3(gl_ModelViewMatrix);
@@ -37,7 +41,6 @@ void main()
 	frag_color.xyz += 0.2*vec3(1,1,0.7)*max(0, exp((ca2-1)/(ca2*m2)) / (3.141592*m2*ca2*ca2));
 	//frag_color.xyz = edir*0.5 + 0.5;
 
-	//frag_color = vec4((texture(tex, uv).rrr), 1);
-
-	frag_color.xyz = pow(frag_color.xyz, vec3(2.4));
+	//frag_color = vec4(w.xy*1000+0.5,0, 1);
+	//frag_color = vec4(vec3(w.z)*100 + max(0, sin((w.z+w.w)*6.28*100)-0.8), 1);
 }

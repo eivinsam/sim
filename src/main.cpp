@@ -3,6 +3,9 @@
 
 #include <GL/glew.h>
 
+#include <gsl-lite.hpp>
+
+#include <array>
 #include <vector>
 #include <random>
 
@@ -22,32 +25,67 @@ std::string read_file(const char* filename)
 }
 
 template <class T>
+class Map;
+template <class T>
+class Location;
+
+class Offset
+{
+	template <class T>
+	friend class Map;
+	template <class T>
+	friend class Location;
+	short _val;
+	constexpr Offset(short val) : _val(val) { }
+public:
+
+	Offset operator+() const { return { +_val }; }
+	Offset operator-() const { return { -_val }; }
+
+	constexpr friend Offset operator+(Offset a, Offset b) { return { a._val + b._val }; }
+	constexpr friend Offset operator-(Offset a, Offset b) { return { a._val - b._val }; }
+
+	constexpr friend Offset operator*(short c, Offset o) { return { o._val * c }; }
+	constexpr friend Offset operator*(Offset o, short c) { return { o._val * c }; }
+
+	template <class T> Location<T> operator+(Location<T> l) const { return { l._it + _val }; }
+};
+
+template <class T>
+class Location
+{
+	friend class Offset;
+	friend class Map<T>;
+	friend class Map<std::remove_const_t<T>>;
+	using iterator = T*;
+	iterator _it;
+
+	Location(iterator it) : _it(std::move(it)) { }
+public:
+
+	T& operator[](Offset o) const { return _it[o._val]; }
+	T& operator*()  const { return *_it; }
+	T* operator->() const { return &*_it; }
+
+	Location& operator+=(Offset o) { _it += o._val; return *this; }
+
+	bool operator< (const Location& that) const { return _it < that._it; }
+	bool operator<=(const Location& that) const { return _it <= that._it; }
+	bool operator!=(const Location& that) const { return _it != that._it; }
+	bool operator==(const Location& that) const { return _it == that._it; }
+	bool operator>=(const Location& that) const { return _it >= that._it; }
+	bool operator> (const Location& that) const { return _it > that._it; }
+
+	Location operator+(Offset o) const { return { _it + o._val }; }
+	Location operator-(Offset o) const { return { _it - o._val }; }
+};
+
+
+template <class T>
 class Map
 {
 	std::vector<T> _data;
 public:
-	class Location;
-	class Offset
-	{
-		friend class Map<T>;
-		friend class Map<T>::Location;
-		short _val;
-		constexpr Offset(short val) : _val(val) { }
-	public:
-
-		Offset operator+() const { return { +_val }; }
-		Offset operator-() const { return { -_val }; }
-
-		constexpr friend Offset operator+(Offset a, Offset b) { return { a._val + b._val }; }
-		constexpr friend Offset operator-(Offset a, Offset b) { return { a._val - b._val }; }
-
-		constexpr friend Offset operator*(short c, Offset o) { return { o._val * c }; }
-		constexpr friend Offset operator*(Offset o, short c) { return { o._val * c }; }
-
-		friend Location operator+(Location l, Offset o);
-		friend Location operator+(Offset o, Location l);
-		friend Location operator-(Location l, Offset o);
-	};
 	Offset row;
 
 	static constexpr Offset col = { 1 };
@@ -59,37 +97,15 @@ public:
 
 	using iterator = T*;
 
-	class Location
-	{
-		friend class Map<T>;
-		iterator _it;
 
-		Location(iterator it) : _it(std::move(it)) { }
-	public:
-
-		decltype(auto) operator[](Offset o) { return _it[o._val]; }
-		decltype(auto) operator*() { return *_it; }
-		decltype(auto) operator->() { return &*_it; }
-
-		Location& operator+=(Offset o) { _it += o._val; return *this; }
-
-		bool operator< (const Location& that) const { return _it <  that._it; }
-		bool operator<=(const Location& that) const { return _it <= that._it; }
-		bool operator!=(const Location& that) const { return _it != that._it; }
-		bool operator==(const Location& that) const { return _it == that._it; }
-		bool operator>=(const Location& that) const { return _it >= that._it; }
-		bool operator> (const Location& that) const { return _it >  that._it; }
-
-		friend Location operator+(Location l, Offset o) { return { l._it + o._val }; }
-		friend Location operator+(Offset o, Location l) { return { l._it + o._val }; }
-		friend Location operator-(Location l, Offset o) { return { l._it - o._val }; }
-	};
-
-	Location operator()(short x, short y) { return _data.data() + (x + row._val * y); }
+	Location<T>       operator()(short x, short y)       { return _data.data() + (x + row._val * y); }
+	Location<const T> operator()(short x, short y) const { return _data.data() + (x + row._val * y); }
 
 
-	Location begin() { return _data.data(); }
-	Location end() { return _data.data() + _data.size(); }
+	Location<T> begin() { return _data.data(); }
+	Location<T> end() { return _data.data() + _data.size(); }
+	Location<const T> begin() const { return _data.data(); }
+	Location<const T> end()   const { return _data.data() + _data.size(); }
 };
 
 
@@ -179,14 +195,14 @@ static std::mt19937 rng;
 
 using ushort = unsigned short;
 
-inline ushort cubic_midpoint(Map<ushort>::Location center, Map<ushort>::Offset incr)
+inline ushort cubic_midpoint(Location<ushort> center, Offset incr)
 {
 	unsigned sum = center[-incr] + center[+incr];
 	sum += sum << 3; // sum *= 9
 	sum -= center[-3 * incr] + center[+3 * incr];
 	return static_cast<ushort>(sum >> 4);
 }
-inline ushort quadratic_endpoint(Map<ushort>::Location center, Map<ushort>::Offset incr)
+inline ushort quadratic_endpoint(Location<ushort> center, Offset incr)
 {
 	unsigned sum = (unsigned(center[incr])<<1) + center[-incr];
 	sum += sum << 1; // sum *= 3
@@ -239,6 +255,154 @@ void recursive_mapgen(Map<ushort>& out, double strength)
 	}
 }
 
+Map<ushort> double_map(const Map<ushort>& src, double strength)
+{
+	Map<ushort> out(src.width() * 2 - 1, src.height() * 2 - 1);
+	auto ot = out.begin();
+	for (auto it = src.begin(); it < src.end(); it += src.row, ot += 2 * out.row)
+	{
+		auto pt = ot;
+		for (auto jt = it; jt < it + src.row; jt += src.col, pt += 2 * out.col)
+		{
+			*pt = *jt;
+		}
+	}
+
+	for (auto it = out.begin(); it < out.end(); it += 2 * out.row)
+	{
+		it[out.col] = quadratic_endpoint(it + out.col, out.col);
+		for (auto jt = it + 3 * out.col; jt < it + out.row - 2 * out.col; jt += 2 * out.col)
+			*jt = cubic_midpoint(jt, out.col);
+		it[out.row - 2 * out.col] = quadratic_endpoint(it + out.row - 2 * out.col, -out.col);
+	}
+	for (auto it = out.begin(); it < out.begin() + out.row; it += out.col)
+		it[out.row] = quadratic_endpoint(it + out.row, out.row);
+	for (auto it = out.end() - out.row; it < out.end(); it += out.col)
+		it[-out.row] = quadratic_endpoint(it - out.row, -out.row);
+	for (auto it = out.begin() + 3 * out.row; it < out.end() - 2 * out.row; it += 2 * out.row)
+		for (auto jt = it; jt < it + out.row; jt += out.col)
+			*jt = cubic_midpoint(jt, out.row);
+	//it[out.col - 2 * out.row] = quadratic_endpoint(it + out.col - 2 * out.row, -out.row);
+	for (auto it = out.begin(); it < out.end(); it += out.row)
+		for (auto jt = it; jt < it + out.row; jt += out.col)
+			*jt = nudge(*jt, strength);
+	return out;
+}
+
+constexpr auto absdiff(ushort a, ushort b) 
+{ 
+	const int diff = int((12 + a - b) & 7) - 4;
+	return diff < 0 ? -diff : diff;
+};
+void graph_mapgen(Map<ushort>& out, double strength)
+{
+	static constexpr ushort sink = 8;
+	static constexpr ushort no_neighbor = 16;
+	struct GridNode
+	{
+		ushort heigth;
+		ushort neighbor = no_neighbor;
+	};
+	Map<GridNode> graph(out.width(), out.height());
+
+	struct Coord
+	{
+		short x;
+		short y;
+
+		Coord operator+(Coord b) const { return { x + b.x, y + b.y }; }
+
+		[[nodiscard]] constexpr bool operator==(Coord b) const { return x == b.x && y == b.y; }
+		[[nodiscard]] constexpr bool operator!=(Coord b) const { return x != b.x || y != b.y; }
+	};
+
+	constexpr Coord neighbors[8]
+	{
+	{ -1, -1 },	{ -1, +0 },	{ -1, +1 }, { +0, +1 },
+	{ +1, +1 }, { +1, +0 }, { +1, -1 }, { +0, -1 }
+	};
+
+	double next_height = 0;
+	strength *= 0.0005;
+
+	std::vector<Coord> agenda;
+
+	Coord cur;
+
+	const auto add_open_neighbors_to_agenda = [&](Coord co)
+	{
+		size_t added = 0;
+		auto lo = graph(co.x, co.y);
+		for (int i = 0; i < 8; ++i)
+		{
+			const auto nco = co + neighbors[i];
+			if (nco.x < 0 || nco.y < 0 || nco.x >= graph.width() || nco.y >= graph.height())
+				continue;
+			const auto nlo = graph(nco.x, nco.y);
+			if (nlo->neighbor == no_neighbor)
+			{
+				nlo->neighbor = (i + 4) & 7;
+				nlo->heigth = ushort(next_height);
+				agenda.push_back(nco);
+				++added;
+			}
+		}
+		return added;
+	};
+
+	for (int i = 0; i < 1; ++i)
+	{
+		cur =
+		{
+			std::uniform_int<short>(0, graph.width())(rng),
+			std::uniform_int<short>(0, graph.height())(rng)
+		};
+		*graph(cur.x, cur.y) = { 0, sink };
+		add_open_neighbors_to_agenda(cur);
+	}
+
+	std::vector<size_t> roulette;
+	while (!agenda.empty())
+	{
+		auto select = std::uniform_int<size_t>(0, agenda.size()-1)(rng);
+		cur = agenda[select];
+		agenda[select] = agenda.back();
+		agenda.pop_back();
+		add_open_neighbors_to_agenda(cur);
+		//while (auto added = add_open_neighbors_to_agenda(cur))
+		//{
+		//	auto clo = graph(cur.x, cur.y);
+		//	for (auto i = added; i > 0; --i)
+		//	{
+		//		const auto ai = agenda.size() - i;
+		//		auto ico = agenda[ai];
+		//		auto ilo = graph(ico.x, ico.y);
+		//		for (auto k = 3 - absdiff(clo->neighbor, ilo->neighbor); k > 0; --k)
+		//			roulette.push_back(ai);
+		//	}
+		//	if (roulette.empty())
+		//		break;
+		//	const auto clear_roulette = gsl::finally([&] { roulette.clear(); });
+		//	const auto roulette_i = std::uniform_int<size_t>(0, roulette.size()-1)(rng);
+		//	if (roulette_i == roulette.size())
+		//		break;
+		//	const auto new_select = roulette[roulette_i];
+		//	strength += 0.0002;
+		//	cur = agenda[new_select];
+		//	agenda[new_select] = agenda.back();
+		//	agenda.pop_back();
+		//}
+
+		next_height += strength;
+		strength += 0.0000005;
+	}
+
+	for (short y = 0; y < graph.height(); ++y)
+		for (short x = 0; x < graph.width(); ++x)
+			*out(x, y) = graph(x, y)->heigth;
+}
+
+
 template <class T, void (*G)(GLenum, T*)>
 T gl_get(GLenum key) { T result; G(key, &result); return result; }
 
@@ -276,9 +440,18 @@ int main()
 
 	constexpr auto tex_target = GL_TEXTURE_RECTANGLE;
 
-	short mapsize = 513;
-	Map<unsigned short> map(mapsize, mapsize);
-	recursive_mapgen(map, 20);
+	Map<ushort> map(3, 3);
+
+	for (auto it = map.begin(); it != map.end(); it += map.col)
+		*it = 14000+std::uniform_int<ushort>(0, 12000)(rng);
+
+	for (int i = 0; i < 9; ++i)
+		map = double_map(map,3500.0*pow(0.5, i));
+
+	const short mapsize = map.width();
+	//Map<unsigned short> map(mapsize, mapsize);
+	//recursive_mapgen(map, 20);
+	//graph_mapgen(map, 20);
 
 	GLuint tex; 
 	glGenTextures(1, &tex);
@@ -299,19 +472,19 @@ int main()
 	};
 
 
-	const short wmapsize = mapsize / 2 + 1;
+	const short wmapsize = mapsize;// / 2 + 1;
 	auto hramp = [](ushort iz)
 	{
 		float z = iz / float(0x10000);
-		z -= 0.4f;
+		z -= 0.2f;
 		z = 15*z * z*z;
 		return static_cast<ushort>(std::clamp(int((z+0.4f) * 0x10000), 0, 0xffff));
 	};
 	Map<Water> water(wmapsize, wmapsize);
 	auto wl = water.begin();
-	for (auto gr = map.begin(); gr < map.end(); gr += 2 * map.row)
-		for (auto gc = gr; gc < gr + map.row; gc += 2 * map.col, wl += water.col)
-			*wl = { 0x8000,0x8000, 100, hramp(*gc) };
+	for (auto gr = map.begin(); gr < map.end(); gr += 1 * map.row)
+		for (auto gc = gr; gc < gr + map.row; gc += 1 * map.col, wl += water.col)
+			*wl = { 0x8000*0,0x8000*0, 200, hramp(*gc) };//hramp(*gc) };
 
 	//water(wmapsize / 2 + 1, wmapsize / 2 + 1)->h = 10000;
 
@@ -329,6 +502,19 @@ int main()
 	glTexParameteri(tex_target, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
 	glTexImage2D(tex_target, 0, GL_RGBA32F, wmapsize, wmapsize, 0, GL_RGBA, GL_UNSIGNED_SHORT, 0);
 	glTexParameterfv(tex_target, GL_TEXTURE_BORDER_COLOR, water_border);
+	GLuint erode_tex[2];
+	glGenTextures(2, erode_tex);
+	glBindTexture(tex_target, erode_tex[0]);
+	glTexParameteri(tex_target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(tex_target, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+	glTexImage2D(tex_target, 0, GL_RG32F, wmapsize, wmapsize, 0, GL_RGBA, GL_UNSIGNED_SHORT, 0);
+	glTexParameterfv(tex_target, GL_TEXTURE_BORDER_COLOR, water_border);
+	glBindTexture(tex_target, erode_tex[1]);
+	glTexParameteri(tex_target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(tex_target, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+	glTexImage2D(tex_target, 0, GL_RG32F, wmapsize, wmapsize, 0, GL_RGBA, GL_UNSIGNED_SHORT, 0);
+	glTexParameterfv(tex_target, GL_TEXTURE_BORDER_COLOR, water_border);
+
 
 	GLuint water_fb;
 	glGenFramebuffers(1, &water_fb);
@@ -348,29 +534,42 @@ int main()
 	{
 		if (key == oui::Key::a || key == oui::Key::e)
 		{
-			glBindFramebuffer(GL_FRAMEBUFFER, water_fb);
-			glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, water_tex[1], 0);
+			GLenum bufs[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 
 			auto status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 
 			glViewport(0, 0, wmapsize, wmapsize);
 			glDisable(GL_CULL_FACE);
 			glDisable(GL_DEPTH_TEST);
-			glBindTexture(tex_target, water_tex[0]);
 			glBlendFunc(GL_ONE, GL_ZERO);
 
 			auto aprog = key == oui::Key::a ? flow_prog : erode_prog;
 
 			glUseProgram(aprog);
-			glUniform1f(glGetUniformLocation(aprog, "dt"), 0.05);
-			glUniform1f(glGetUniformLocation(aprog, "rdx"), 1.0);
-			glUniform1f(glGetUniformLocation(aprog, "rdy"), 1.0);
+			glUniform1f(glGetUniformLocation(aprog, "dt"), 0.01);
+			glUniform1f(glGetUniformLocation(aprog, "rdx"), 10.0);
+			glUniform1f(glGetUniformLocation(aprog, "rdy"), 10.0);
 
-			glDrawArrays(GL_QUADS, 0, 4);
+			for (auto i = 0; i < (aprog == flow_prog ? 16 : 1); ++i)
+			{
+				glBindFramebuffer(GL_FRAMEBUFFER, water_fb);
+				glDrawBuffers(2, bufs);
+				glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, water_tex[1], 0);
+				glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, erode_tex[1], 0);
 
-			glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 0, 0);
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(tex_target, erode_tex[0]);
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(tex_target, water_tex[0]);
 
-			std::swap(water_tex[0], water_tex[1]);
+				glDrawArrays(GL_QUADS, 0, 4);
+				glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 0, 0);
+				glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, 0, 0);
+				std::swap(water_tex[0], water_tex[1]);
+				std::swap(erode_tex[0], erode_tex[1]);
+			}
+
+			glDrawBuffer(GL_COLOR_ATTACHMENT1);
 			glEnable(GL_DEPTH_TEST);
 			glEnable(GL_CULL_FACE);
 			glViewport(0, 0, window.size.x, window.size.y);
@@ -392,14 +591,14 @@ int main()
 		glPolygonMode(GL_FRONT, GL_FILL);
 
 		glEnable(tex_target);
-		//glEnable(GL_FRAMEBUFFER_SRGB);
+		glEnable(GL_DEPTH_TEST);
 
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
 		gluPerspective(45, window.size.x / window.size.y, 0.1f, 10.0f);
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
-		gluLookAt(cos(1+0*time/5)*2, sin(1+0*time/5)*2, 2, 0, 0, 0, 0, 0, 1);
+		gluLookAt(cos(1+0*time/10)*2, sin(1+0*time/10)*2, 2, 0, 0, 0, 0, 0, 1);
 
 		glUseProgram(prog);
 		glProgramUniform1i(prog, glGetUniformLocation(prog, "tex"), 0);
@@ -408,12 +607,13 @@ int main()
 		glDrawArrays(GL_PATCHES, 0, 4);
 
 		glUseProgram(water_prog);
-		glProgramUniform1i(water_prog, glGetUniformLocation(water_prog, "tex"), 0);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(tex_target, erode_tex[0]);
+		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(tex_target, water_tex[0]);
 
-		glDrawArrays(GL_PATCHES, 0, 4);
 
-		//glDisable(GL_FRAMEBUFFER_SRGB);
+		glDrawArrays(GL_PATCHES, 0, 4);
 
 		window.redraw();
 	}
