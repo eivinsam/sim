@@ -4,3 +4,4 @@ A simulator game maybe, currently just a simple terrain generator and shallow wa
 ### Screenshots
 Sample terrain after running the water simulation to convergence
 ![](doc/terrain00.png)
+![](doc/terrain01.png)
